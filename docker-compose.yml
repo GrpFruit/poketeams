@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: poketeams
+      POSTGRES_PASSWORD: poketeams
+      POSTGRES_DB: teambuilder
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+
+
+  catalog-service:
+    build: ./services/catalog
+    ports: ["5001:8080"]
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      REDIS__CONNECTIONSTRING: "redis:6379"
+      POKEAPI__BASEURL: "https://pokeapi.co/api/v2/"
+    depends_on: [redis]
+
+
+  teambuilder-service:
+    build: ./services/teambuilder
+    ports: ["5002:8080"]
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: Host=postgres;Database=teambuilder;Username=poketeams;Password=poketeams
+    depends_on: [postgres]
+
+
+  api-gateway:
+    build: ./gateway
+    ports: ["5000:8080"]
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      Downstreams__Catalog: http://catalog-service:8080
+      Downstreams__TeamBuilder: http://teambuilder-service:8080
+    depends_on: [catalog-service, teambuilder-service]
+
+
+volumes:
+  pgdata:
